@@ -84,8 +84,8 @@
             document.getElementById('answers').innerHTML = window.data.answers.map(
                     function (cur, i) {
                         return '<div id="answer'+ i +'" class="answer">'+
-                                '<label for="answerInput'+i+'">('+ (i + 1)+')</label>'+
-                                '<input id="answerInput'+i+'" type="text" onkeyup="onInteraction('+i+')">' +
+                                '<label class="bmd-label-floating" for="answerInput'+i+'">('+ (i + 1)+')</label>'+
+                                '<input class="form-control" id="answerInput'+i+'" type="text" onkeyup="onInteraction('+i+')">' +
                                 '<div class="result" id="result'+i+'"></div>' +
                                 '</div>';
                     }).reduce(function (acc, cur) {
