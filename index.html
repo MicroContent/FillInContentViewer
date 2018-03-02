@@ -39,6 +39,9 @@
        #description {
             margin-bottom: 10px;
        }
+       .black {
+           color: black;
+       }
 
     </style>
 </head>
@@ -245,7 +248,7 @@
         }
 
         function getTrueAnswers(id) {
-            return window.data.answers[id].join(" , ");
+            return window.data.answers[id].join('<span class="black"> or </span>');
         }
 
         function testingfunction (e) {
