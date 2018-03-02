@@ -17,114 +17,52 @@
         }
     </script>
     <style type ="text/css">
-        .answer {
-            display: flex;
-            margin-top: 10px;
-        }
-        .answer > button {
-            color: white;
-            background-color: #3f51b5;
-            margin-left: 5px;
-            height: fit-content;
-            border: 0px;
-            border-radius: 100%;
-            width: 20px;
-            height: 20px;
-            margin-top: auto;
-            margin-bottom: auto;
-        } 
-        .answer > button > i {
-            margin-left: -2px;
-            font-size: inherit;
-        }
-        .answer > p {
-            margin-top: auto;
-            margin-bottom: auto;
-        }
-        .answer > p:first-of-type {
-            margin-left: 10px;
-            margin-right: 10px;
-        }
-        .hide2 {
-            visibility: hidden;
-        }
-        .answertrue {
-            color: green;
-            text-decoration: solid;
-        }
-        .answerfalse {
-            color: red;
-            text-decoration: line-through;
-        }
+       .dontDisplay {
+           display: none;
+       }
+       .result {
+           display: inline;
+       }
+       .result > div {
+           display: inline;
+       }
+       .correct {
+           background-color: green;
+       }
+       .false {
+           background-color: red;
+       }
+
     </style>
 </head>
 <body>
-    <div id="question"></div>
-    <div id="sortingContainer"></div>
+    <div id="description"></div>
+    <div id="answers"></div>
     <div id="contextContainer">
         <button id="showContextHeader" class="btn btn-primary" onclick="showHideContext()"></button>
         <p id="contextContentContainer"></p>
     </div>
 
-    <!-- for testing only 
+    <!-- for testing only -->
     <h1>testingfunction</h1><div id="testingfunction"></div>
-    -->
+    
 
-    <script type="application/javascript">
+    <script type="application/javascript"> 
         function getXapiObject(){
             return {
-                "objectType": "Activity",
-                // id is set by hosting application
-                "id": undefined,
                 "definition": {
                     "description": {
-                        "en-US": window.data.question,
-                        "de-AT": window.data.question
+                        "en-US": window.data.description
                     },
                     "type": "http://adlnet.gov/expapi/activities/cmi.interaction",
-                    "interactionType": "sequencing",
-                    "correctResponsesPattern": [
-                        window.data.answers.reduce(function (acc, e, i) {
-                                return (acc.length > 0) ? acc + "[,]" + (i+1) : (i+1)+"";
-                            }, "")
-                    ],
-                    "choices": window.data.answers.map(function (e, i) {
-                        return {
-                            id: e.id.toString(),
-                            description: {
-                                "de-AT": e.value
-                            }
-                        }
-                    }) 
+                    "interactionType": "fill-in",
+                    "correctResponsesPattern": 
+                        getAllCombinations(window.data.answers).map(function(e){ return e.join("[,]") }) 
+                    
                 }
             }
         }
         
-        function setQuestion() {
-            document.getElementById('question').innerHTML = window.data.question;
-        }
-
-        function setSortingOptions(){
-            //testingfunction(window.data.answers);
-            document.getElementById('sortingContainer').innerHTML = window.data.answers.map(
-                    function (cur, i) {
-                        var buttonStyle = "";
-                        var buttonUp = '<button class="'+buttonStyle+' voteButton up'+cur.id+'" onclick="onMoveUp('+cur.id+')"><i class="material-icons">expand_less</i></button>';
-                        var buttonDown = '<button class="'+buttonStyle+' voteButton down'+cur.id+'" onclick="onMoveDown('+cur.id+')"><i class="material-icons">expand_more</i></button>';
-                        if (i==0) buttonUp = '<button class="'+buttonStyle+' voteButton hide2 up'+cur.id+'" onclick="onMoveUp('+cur.id+')"><i class="material-icons">expand_more</i></button>';
-                        if (i==(window.data.answers.length-1)) buttonDown = '<button class="voteButton '+buttonStyle+' hide2 down'+cur.id+'" onclick="onMoveDown('+cur.id+')"><i class="material-icons">expand_less</i></button>';
-                        return '<div id="answer'+ cur.id +'" class="answer">'+
-                                buttonUp+
-                                buttonDown+
-                                '<p id="solution'+cur.id+'">' +
-                                '<p>' + (i+1) +'. </p>' +
-                                '<p>' + cur.value +'</p>' +
-                                '</div>';
-                    }).reduce(function (acc, cur) {
-                return acc + cur
-            }, '');
-        }
-
         function setContext(){
             var context = document.getElementById('contextContainer');
  
@@ -142,6 +80,23 @@
             showHideContext();
         }
 
+        function setAnswers () {
+            document.getElementById('answers').innerHTML = window.data.answers.map(
+                    function (cur, i) {
+                        return '<div id="answer'+ i +'" class="answer">'+
+                                '<label for="answerInput'+i+'">('+ (i + 1)+')</label>'+
+                                '<input id="answerInput'+i+'" type="text" onkeyup="onInteraction('+i+')">' +
+                                '<div class="result" id="result'+i+'"></div>' +
+                                '</div>';
+                    }).reduce(function (acc, cur) {
+                return acc + cur
+            }, '');
+        }
+
+        function setDescription () {
+            document.getElementById("description").innerHTML = window.data.description;
+        }
+        
         function onSubmit(){
             if (!isShowingSolution) {
                 var allRight = true;
@@ -160,109 +115,57 @@
                 };
                 stmt.object = getXapiObject();
                 stmt.result = {
-                    response: window.data.answers.reduce(function (acc, e, i) {
-                                return (acc.length > 0) ? acc + "[,]" + e.id : e.id+"";
-                    }, ""),
-                    success: allRight
+                    response: getCurrentAnswers(),
+                    success: checkIfCurrentAnswersCorrect()
                 };
                 sendStatement(stmt);
                 isShowingSolution = true;
-
-                //display answer state
-                var answers = document.getElementsByClassName('answer');
-                for (var i = 0; i < answers.length; i++) {
-                   if (window.data.answers[i].id == (i+1)) {
-                       answers[i].firstChild.nextSibling.nextSibling.nextSibling.classList.add("answertrue");
-                       answers[i].firstChild.nextSibling.nextSibling.nextSibling.nextSibling.classList.add("answertrue");
-                   }
-                   else {
-                       answers[i].firstChild.nextSibling.nextSibling.nextSibling.classList.add("answerfalse");
-                       answers[i].firstChild.nextSibling.nextSibling.nextSibling.nextSibling.classList.add("answerfalse");
-                       //var solution = document.createElement("p");
-                       var solution = document.getElementById("solution"+(i+1));
-                       solution.classList.add("answertrue");
-                       solution.classList.add("solution");
-                       solution.innerHTML = window.data.answers[i].id + ". " + window.data.answers[i].value ;
-                       //answers[i].insertBefore(solution, answers[i].firstChild);
-                   }
-                }
-
-                //hide voting Buttons
-                var votingButtons = document.getElementsByClassName('voteButton');
-                for (var i = 0; i < votingButtons.length; i++) {
-                   votingButtons[i].classList.add("hide2"); 
+                
+                //display answer state   
+                for (var i=0;i<window.data.answers.length;i++) {
+                    document.getElementById("answerInput"+i).classList.add("dontDisplay");
+                    var result = document.getElementById("result"+i);
+                    if (checkIfCurrentAnswerCorrect(i)) {
+                        result.innerHTML = '<div class="correct">'+document.getElementById("answerInput"+i).value+'</div>';
+                    } else {
+                        result.innerHTML = '<div class="false">'+document.getElementById("answerInput"+i).value+'</div>';
+                        result.innerHTML += '<div class="correct">'+getTrueAnswers(i)+'</div>'
+                    }
                 }
             }
             else {
                 //remove answer state
-                var answers = document.getElementsByClassName('answer');
-                for (var i = 0; i < answers.length; i++) {
-                   if (window.data.answers[i].id == (i+1)) {
-                        answers[i].firstChild.nextSibling.nextSibling.nextSibling.classList.remove("answertrue");
-                        answers[i].firstChild.nextSibling.nextSibling.nextSibling.nextSibling.classList.remove("answertrue");
-                    }
-                   else {
-                       answers[i].firstChild.nextSibling.nextSibling.nextSibling.classList.remove("answerfalse");
-                       answers[i].firstChild.nextSibling.nextSibling.nextSibling.nextSibling.classList.remove("answerfalse");
-                       var solution = document.getElementById("solution"+(i+1));
-                       solution.classList.remove("answertrue");
-                       solution.classList.remove("solution");
-                       solution.innerHTML = "";
-                   }
+                for (var i=0;i<window.data.answers.length;i++) {
+                    document.getElementById("answerInput"+i).classList.remove("dontDisplay");
+                    document.getElementById("result"+i).innerHTML = '';  
                 }
-                
-                
-                var solutions = document.getElementsByClassName('solution');
-                for (var i = 0; i < solutions.length; i++) {
-                solutions[i].parentNode.removeChild();
-                } 
-
-                // show voting buttons
-                var votingButtons = document.getElementsByClassName('voteButton');
-                for (var i = 0; i < votingButtons.length; i++) {
-                   votingButtons[i].classList.remove("hide2"); 
-                }
-                
-                setSortingOptions();
                 isShowingSolution = false;
             }
+                 
             setContext();
         }
 
-        function onInteraction(){
-            var stmt = {};
-            // actor is set by hosting application
-            stmt.actor = undefined;
-            stmt.verb = {
-                "id": "http://adlnet.gov/expapi/verbs/interacted",
-                "display": {
-                    "de-DE": "interagierte",
-                    "en-US": "interacted",
-                    "fr-FR": "a interagi",
-                    "es-ES": "interactuó"
-                }
-            };
-            stmt.object = getXapiObject();
-            stmt.result = {
-                response: window.data.answers.reduce(function (acc, e, i) {
-                                return (acc.length > 0) ? acc + "[,]" + e.id : e.id+"";
-                }, "")
-            };
-            sendStatement(stmt);
-        }
-
-        function onMoveUp(id){
-            var position = findIndexOfArrayElement(window.data.answers, id); 
-            window.data.answers = moveArrayElement(window.data.answers,position,position-1);
-            setSortingOptions();
-            onInteraction();
-        }
-
-        function onMoveDown(id){
-            var position = findIndexOfArrayElement(window.data.answers, id); 
-            window.data.answers = moveArrayElement(window.data.answers,position,position+1);
-            setSortingOptions();
-            onInteraction();
+        function onInteraction(id){
+            if (currentAnswerState != getCurrentAnswers()) {
+                currentAnswerState = getCurrentAnswers();
+                // ändrnung im vergleich zum vorigen Zustand hat stattgefunden
+                var stmt = {};
+                // actor is set by hosting application
+                stmt.actor = undefined;
+                stmt.verb = {
+                    "id": "http://adlnet.gov/expapi/verbs/interacted",
+                    "display": {
+                        "de-DE": "interagierte",
+                        "en-US": "interacted",
+                        "fr-FR": "a interagi",
+                        "es-ES": "interactuó"
+                    }
+                };
+                stmt.object = getXapiObject();
+                stmt.result = {
+                    response: getCurrentAnswers()
+                };
+            }             
         }
 
         function showHideContext(){
@@ -278,46 +181,63 @@
             updateLayout();
         }
 
-        function moveArrayElement (array,from,to) {
-            //to reorder 1 element in array
-            array.splice(to,0,array.splice(from,1)[0]);
-            return array;
-        }
-
-        function findIndexOfArrayElement (array, id) {
-          for (var i = 0; i<array.length;i++) {
-            if (array[i].id == id) return i; 
-          }
-          return -1;
-        }
-
-        function checkIfCurrentAnswersCorrect () {
-            var current = window.data.answers.reduce(function (acc, e, i) {
-                                return (acc.length > 0) ? acc + "[,]" + e.id : e.id+"";
-                    }, "");
-            var shouldBe = window.data.answers.reduce(function (acc, e, i) {
-                                return (acc.length > 0) ? acc + "[,]" + (i+1) : (i+1)+"";
-                            }, "");
-            return !(Boolean(current.localeCompare(shouldBe)));
+        function checkIfCurrentAnswerCorrect (id) {
+            //return true if answer @ postion (textinputfield) = correct
+            //return false if answer @ postion (textinputfield) = incorrect
+            for (var i = 0; i < window.data.answers[id].length; i++){
+                if (window.data.answers[id][i] == document.getElementById("answerInput"+id).value) return true;
+            }
+            return false;
         } 
 
-        function shuffle (array) {
-            var counter = array.length;
-
-            // While there are elements in the array
-            while (counter > 0) {
-                // Pick a random index
-                var index = Math.floor(Math.random() * counter);
-
-                // Decrease counter by 1
-                counter = counter-1;
-
-                // And swap the last element with it
-                var temp = array[counter];
-                array[counter] = array[index];
-                array[index] = temp;
+        function checkIfCurrentAnswersCorrect () {
+            //return true if all answers = correct
+            //return false if 1 answer out of all = incorrect
+            for (var i = 0; i < window.data.answers.length; i++){
+                if (checkIfCurrentAnswerCorrect(i) == false) return false;
             }
-            return array;
+            return true;
+        } 
+
+        function getAllCombinations(arraysToCombine) {
+            var divisors = [];
+            for (var i = arraysToCombine.length - 1; i >= 0; i--) {
+            divisors[i] = divisors[i + 1] ? divisors[i + 1] * arraysToCombine[i + 1].length : 1;
+        }
+            
+        function getPermutation(n, arraysToCombine) {
+            var result = [], 
+                curArray;    
+            for (var i = 0; i < arraysToCombine.length; i++) {
+                curArray = arraysToCombine[i];
+                result.push(curArray[Math.floor(n / divisors[i]) % curArray.length]);
+            }    
+            return result;
+            }
+            
+            var numPerms = arraysToCombine[0].length;
+            for(var i = 1; i < arraysToCombine.length; i++) {
+                numPerms *= arraysToCombine[i].length;
+            }
+            
+            var combinations = [];
+            for(var i = 0; i < numPerms; i++) {
+                combinations.push(getPermutation(i, arraysToCombine));
+            }
+            return combinations;
+        }
+
+        function getCurrentAnswers () {
+            var acc = "";
+            for (var i = 0; i < window.data.answers.length; i++) {
+                if (i > 0) acc += "[,]" + document.getElementById("answerInput"+i).value;
+                else acc += document.getElementById("answerInput"+i).value;
+            }        
+            return acc;  
+        }
+
+        function getTrueAnswers(id) {
+            return window.data.answers[id].join(" , ");
         }
 
         function testingfunction (e) {
@@ -326,14 +246,26 @@
         }
 
         init();
-        window.data.answers = shuffle (window.data.answers);
 
         var isShowingSolution = false;
         var isContextShown = false;
 
-        setQuestion();
-        setSortingOptions();
+        setDescription();
+        setAnswers();
         setContext();
+   
+        var currentAnswerState = getCurrentAnswers();
     </script>
 </body>
+
+<!-- {"title":"Dies ist der Titel","priority":1,"type":"FillIN","fillintext":"Der Frühe Vogel [fängt | mag | liebt] den [WURM]","questionContext":"Dies ist ein Hint","answerContext":"Dies ist ne explanation","lastEdit":1519984918347,"answers":[["fängt","mag","liebt"],["WURM"]],"id":0,"lessonId":0,"releaseStatus":"PUBLIC","editable":null,"learningStatus":0,"skipStatus":"NEVER_SKIPPABLE","multimedia":[],"description":"Der Frühe Vogel (1) den (2)"} 
+
+%7B%22title%22%3A%22Dies%20ist%20der%20Titel%22%2C%22priority%22%3A1%2C%22type%22%3A%22FillIN%22%2C%22fillintext%22%3A%22Der%20Fr%C3%BChe%20Vogel%20%5Bf%C3%A4ngt%20%7C%20mag%20%7C%20liebt%5D%20den%20%5BWURM%5D%22%2C%22questionContext%22%3A%22Dies%20ist%20ein%20Hint%22%2C%22answerContext%22%3A%22Dies%20ist%20ne%20explanation%22%2C%22lastEdit%22%3A1519984918347%2C%22answers%22%3A%5B%5B%22f%C3%A4ngt%22%2C%22mag%22%2C%22liebt%22%5D%2C%5B%22WURM%22%5D%5D%2C%22id%22%3A0%2C%22lessonId%22%3A0%2C%22releaseStatus%22%3A%22PUBLIC%22%2C%22editable%22%3Anull%2C%22learningStatus%22%3A0%2C%22skipStatus%22%3A%22NEVER_SKIPPABLE%22%2C%22multimedia%22%3A%5B%5D%2C%22description%22%3A%22Der%20Fr%C3%BChe%20Vogel%20(1)%20den%20(2)%22%7D
+
+localhost:8001/?data=%7B%22title%22%3A%22Dies%20ist%20der%20Titel%22%2C%22priority%22%3A1%2C%22type%22%3A%22FillIN%22%2C%22fillintext%22%3A%22Der%20Fr%C3%BChe%20Vogel%20%5Bf%C3%A4ngt%20%7C%20mag%20%7C%20liebt%5D%20den%20%5BWURM%5D%22%2C%22questionContext%22%3A%22Dies%20ist%20ein%20Hint%22%2C%22answerContext%22%3A%22Dies%20ist%20ne%20explanation%22%2C%22lastEdit%22%3A1519984918347%2C%22answers%22%3A%5B%5B%22f%C3%A4ngt%22%2C%22mag%22%2C%22liebt%22%5D%2C%5B%22WURM%22%5D%5D%2C%22id%22%3A0%2C%22lessonId%22%3A0%2C%22releaseStatus%22%3A%22PUBLIC%22%2C%22editable%22%3Anull%2C%22learningStatus%22%3A0%2C%22skipStatus%22%3A%22NEVER_SKIPPABLE%22%2C%22multimedia%22%3A%5B%5D%2C%22description%22%3A%22Der%20Fr%C3%BChe%20Vogel%20(1)%20den%20(2)%22%7D&url=http://localhost:8000/index.html
+
+
+-->
+
 </html>
+
