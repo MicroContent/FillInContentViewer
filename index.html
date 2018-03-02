@@ -104,6 +104,9 @@
         }
 
         function setDescription () {
+            for (var i = 0; i < window.data.answers.length; i++) {
+                window.data.fillintext = window.data.fillintext.replace(/\[(.*?)\]/,'<label class="bmd-label-floating">('+(i+1)+')</label>');
+            }
             document.getElementById("description").innerHTML = window.data.description;
         }
         
